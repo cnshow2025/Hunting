@@ -30,13 +30,15 @@
   .stat { background: var(--panel); border-radius: 8px; padding: 6px 10px; font-size: 14px; min-width: 80px; text-align: center; }
   .stat b { font-size: 18px; }
   .stat.warn b { color: #ff8a80; }
-  .hunters { display: flex; gap: 6px; flex-wrap: wrap; justify-content: center; margin-bottom: 8px; }
+  .hunters { display: flex; gap: 6px; flex-wrap: wrap; justify-content: center; margin-bottom: 8px; width: min(94vw, 560px); }
   .hchip {
     background: var(--panel); border: 2px solid transparent; border-radius: 8px;
-    padding: 4px 8px; font-size: 13px; cursor: pointer; color: var(--text);
+    padding: 4px 8px; font-size: 13px; cursor: pointer; color: var(--text); text-align: center;
   }
+  .hchip small { display: block; color: var(--muted); font-size: 11px; }
   .hchip.sel { border-color: #fff; }
-  .hchip.down { opacity: .45; cursor: default; text-decoration: line-through; }
+  .hchip.down { opacity: .45; cursor: default; }
+  .hchip.down b { text-decoration: line-through; }
   .wrap { position: relative; width: min(94vw, 560px); }
   #board {
     display: grid; grid-template-columns: repeat(12, 1fr);
@@ -53,22 +55,29 @@
   .cell .tint { position: absolute; inset: 0; pointer-events: none; }
   .cell.reach::after {
     content: ""; position: absolute; inset: 2px; pointer-events: none;
-    border: 2px dashed rgba(255, 255, 255, .6); border-radius: 3px;
+    border: 2px dashed rgba(255, 255, 255, .75); border-radius: 3px;
   }
   .cell.sel { box-shadow: inset 0 0 0 3px #fff; }
+  .cell.alert { animation: alert .8s ease-in-out infinite alternate; }
+  @keyframes alert {
+    from { box-shadow: inset 0 0 0 3px #fff; }
+    to { box-shadow: inset 0 0 0 3px #ff5252; }
+  }
   .cell .icon { position: relative; }
+  .cell .opt { color: #fff; font-weight: bold; text-shadow: 0 0 3px #000; }
   .badge {
     position: absolute; top: 1px; right: 1px; width: 44%; height: 44%; border-radius: 50%;
     font-size: min(2.8vw, 14px); font-weight: bold; color: #111;
     display: flex; align-items: center; justify-content: center;
     border: 1px solid rgba(0, 0, 0, .45);
   }
-  .ammo, .tag {
+  .ammo, .tag, .dir {
     position: absolute; font-size: min(2.4vw, 11px); color: #fff;
     text-shadow: 0 0 2px #000, 0 0 2px #000;
   }
   .ammo { bottom: 1px; left: 2px; }
   .tag { top: 1px; left: 2px; }
+  .dir { bottom: 0; right: 2px; font-size: min(3vw, 14px); font-weight: bold; }
   .faded { opacity: .55; }
   #fx { position: absolute; inset: 0; pointer-events: none; overflow: visible; }
   .arrow {
@@ -95,17 +104,25 @@
   }
   #overlay.hidden { display: none; }
   .card {
-    background: var(--panel); border-radius: 12px; padding: 18px 20px; max-width: 86%;
+    background: var(--panel); border-radius: 12px; padding: 18px 20px; max-width: 90%;
     text-align: center; box-shadow: 0 6px 24px rgba(0, 0, 0, .4);
   }
   .card h2 { margin: 0 0 8px; }
   .card p { margin: 6px 0; color: var(--muted); }
-  button.main {
-    margin-top: 10px; font-size: 16px; padding: 8px 20px; border: 0; border-radius: 8px;
-    background: #f9a825; color: #222; font-weight: bold; cursor: pointer;
+  button.main, button.alt {
+    font-size: 16px; padding: 8px 18px; border: 0; border-radius: 8px;
+    font-weight: bold; cursor: pointer; margin: 4px;
   }
+  button.main { background: #f9a825; color: #222; }
+  button.alt { background: #546e7a; color: #fff; }
+  button:disabled { opacity: .4; cursor: default; }
+  #panel {
+    width: min(94vw, 560px); min-height: 64px; margin-top: 8px; padding: 8px 12px;
+    background: var(--panel); border-radius: 8px; text-align: center;
+  }
+  #panel .title { font-size: 15px; margin-bottom: 4px; }
+  #panel.decide { outline: 2px solid #ff5252; }
   #msg { min-height: 22px; margin: 8px 0 4px; color: #ffe082; font-size: 15px; text-align: center; }
-  .controls { margin-top: 4px; }
   .rules {
     width: min(94vw, 560px); background: var(--panel); border-radius: 8px;
     padding: 10px 14px; margin-top: 12px; font-size: 14px; color: var(--muted); line-height: 1.6;
@@ -121,8 +138,8 @@
 <div class="hud">
   <div class="stat" id="statTime">⏱ 时间<br><b id="time">3:00</b></div>
   <div class="stat">🦊 抓到<br><b id="score">0</b></div>
-  <div class="stat">🤠 猎人<br><b id="alive">5</b></div>
-  <div class="stat">🔄 回合<br><b id="turn">0</b></div>
+  <div class="stat">🧑 猎人<br><b id="alive">5</b></div>
+  <div class="stat">📍 状态<br><b id="status">—</b></div>
 </div>
 <div class="hunters" id="hunters"></div>
 
@@ -134,25 +151,27 @@
   </div>
 </div>
 
+<div id="panel"></div>
 <div id="msg"></div>
-<div class="controls"><button class="main" id="restart">重新开始</button></div>
+<div><button class="alt" id="restart">重新开始</button></div>
 
 <div class="rules">
   <h3>玩法</h3>
   <ul>
-    <li>点一个猎人选中它，虚线框是它的九宫格。</li>
-    <li><b>单击</b>九宫格里的格子 → 走一步；<b>双击</b> → 射一支箭。</li>
-    <li>每走一步或射一箭，所有狐狸也会随机走一步。</li>
-    <li>猎人头上的数字 = 九宫格里有几只狐狸：
+    <li><b>布阵</b>：点一个猎人，再点他身边的箭头，给他定一个出发方向。都定好后点「出发」。</li>
+    <li>猎人会按自己的走法和速度<b>自动前进</b>，碰到地图边就折返。狐狸也会不停地随机乱跑。</li>
+    <li>猎人身上的数字 = 感应范围里有几只狐狸：
       <span style="background:#4caf50"></span>0
       <span style="background:#fbc02d"></span>1
       <span style="background:#fb8c00"></span>2
       <span style="background:#e53935"></span>3+
     </li>
-    <li>射中狐狸，它会现身并被抓住；射空就浪费一支箭。每个猎人开局 5 支箭。</li>
+    <li>一旦有猎人感应到狐狸，<b>游戏会暂停</b>，由你决定：
+      <b>🏹 攻击</b>（在范围里点一格射箭）或 <b>🚶 移开</b>（他自动往狐狸少的方向避开，之后 3 步内不再为此停下）。</li>
+    <li>射中狐狸，它会现身并被抓住；射空就浪费一支箭。</li>
     <li>地图上藏着 4 个箭袋 🎁，踩到就 +3 支箭。</li>
     <li>狐狸走到猎人身上，或猎人走进狐狸的格子，猎人就被咬倒下。</li>
-    <li>3 分钟内看你能抓到几只狐狸！</li>
+    <li>3 分钟内（暂停时不计时）看你能抓到几只狐狸！</li>
   </ul>
 </div>
 
@@ -160,23 +179,40 @@
 (() => {
   const SIZE = 12;
   const FOX_COUNT = 10;
-  const HUNTER_COUNT = 5;
-  const START_ARROWS = 5;
   const TREASURE_COUNT = 4;
   const TREASURE_ARROWS = 3;
-  const TIME_LIMIT = 180;
-  const DBL_CLICK_MS = 280;
+  const TIME_LIMIT = 180000;
+  const FOX_SPEED = 1200;
+  const TICK = 100;
+  const MOVE_AWAY_GRACE = 3;
   const HUNTER_START_X = [1, 3, 6, 8, 10];
   const COLORS = ['76,175,80', '251,192,45', '251,140,0', '229,57,53'];
+
+  const ORTHO = [[0, -1], [1, 0], [0, 1], [-1, 0]];
+  const DIAG = [[1, -1], [1, 1], [-1, 1], [-1, -1]];
+  const ALL8 = [[0, -1], [1, -1], [1, 0], [1, 1], [0, 1], [-1, 1], [-1, 0], [-1, -1]];
+  const DIR_GLYPH = {
+    '0,-1': '↑', '1,-1': '↗', '1,0': '→', '1,1': '↘',
+    '0,1': '↓', '-1,1': '↙', '-1,0': '←', '-1,-1': '↖',
+  };
+  const ROLES = [
+    { name: '快腿', icon: '🏃', dirs: ORTHO, step: 1, speed: 600, arrows: 4, sense: 1, desc: '直走 · 最快' },
+    { name: '斜行者', icon: '🤸', dirs: DIAG, step: 1, speed: 1000, arrows: 5, sense: 1, desc: '只走斜线' },
+    { name: '跳跃者', icon: '🦘', dirs: ORTHO, step: 2, speed: 1500, arrows: 5, sense: 1, desc: '一次跳 2 格' },
+    { name: '老猎人', icon: '🧓', dirs: ALL8, step: 1, speed: 1500, arrows: 7, sense: 1, desc: '8 方向 · 箭多' },
+    { name: '猎犬手', icon: '🐕', dirs: ORTHO, step: 1, speed: 1000, arrows: 5, sense: 2, desc: '感应 5×5' },
+  ];
 
   const boardEl = document.getElementById('board');
   const fxEl = document.getElementById('fx');
   const overlayEl = document.getElementById('overlay');
   const cardEl = document.getElementById('card');
+  const panelEl = document.getElementById('panel');
   const msgEl = document.getElementById('msg');
   const huntersEl = document.getElementById('hunters');
 
-  let hunters, foxes, treasures, selId, score, turn, timeLeft, timer, state, busy, pending;
+  // state: 'ready' | 'setup' | 'play' | 'decide' | 'aim' | 'over'
+  let hunters, foxes, treasures, selId, score, timeLeft, foxCd, loop, state, busy;
 
   const rand = n => Math.floor(Math.random() * n);
   const key = (x, y) => x + ',' + y;
@@ -186,26 +222,27 @@
   const hunterAt = (x, y) => hunters.find(h => h.alive && h.x === x && h.y === y);
   const foxAt = (x, y) => foxes.find(f => f.x === x && f.y === y);
   const selected = () => hunters.find(h => h.id === selId && h.alive);
-  const countAround = h => foxes.filter(f => cheb(f, h) <= 1).length;
+  const countAt = (x, y, sense) => foxes.filter(f => cheb(f, { x, y }) <= sense).length;
+  const countAround = h => countAt(h.x, h.y, h.role.sense);
   const colorFor = n => COLORS[Math.min(n, 3)];
-  const sleep = ms => new Promise(r => setTimeout(r, ms));
+  const label = h => `${h.role.icon}${h.role.name}`;
 
   function msg(text) { msgEl.textContent = text; }
 
   function newGame() {
-    clearInterval(timer);
-    clearPending();
+    clearInterval(loop);
     fxEl.innerHTML = '';
     overlayEl.onclick = null;
-    hunters = HUNTER_START_X.slice(0, HUNTER_COUNT).map((x, i) => ({
-      id: i + 1, x, y: SIZE - 1, arrows: START_ARROWS, alive: true,
+    hunters = ROLES.map((role, i) => ({
+      id: i + 1, role, x: HUNTER_START_X[i], y: SIZE - 1,
+      dir: role.dirs[0].slice(), arrows: role.arrows, alive: true, cd: role.speed, ignore: 0,
     }));
     const taken = new Set(hunters.map(h => key(h.x, h.y)));
-    // 狐狸不会一开始就出现在猎人的九宫格里
+    // 狐狸开局不会出现在任何猎人的感应范围里（猎犬手是 5×5）
     foxes = [];
     while (foxes.length < FOX_COUNT) {
       const p = { x: rand(SIZE), y: rand(SIZE) };
-      if (taken.has(key(p.x, p.y)) || hunters.some(h => cheb(h, p) <= 1)) continue;
+      if (taken.has(key(p.x, p.y)) || hunters.some(h => cheb(h, p) <= 2)) continue;
       taken.add(key(p.x, p.y));
       foxes.push(p);
     }
@@ -218,29 +255,25 @@
     }
     selId = 1;
     score = 0;
-    turn = 0;
     timeLeft = TIME_LIMIT;
+    foxCd = FOX_SPEED;
     busy = false;
     state = 'ready';
     msg('');
     render();
     showCard('🦊 狐狸狩猎',
-      `<p>5 个猎人，10 只看不见的狐狸。</p>
-       <p>单击走一步，双击射箭。</p>
-       <p>3 分钟内能抓到几只？</p>`,
-      '开始游戏', startGame);
+      `<p>5 个各有本领的猎人，10 只看不见的狐狸。</p>
+       <p>先给每个猎人定方向，他们会自动前进；</p>
+       <p>感应到狐狸时游戏暂停，由你决定攻击还是移开。</p>`,
+      '开始布阵', () => { hideCard(); state = 'setup'; render(); });
   }
 
-  function startGame() {
-    hideCard();
+  function go() {
     state = 'play';
-    msg('选一个猎人，开始打猎吧！');
-    timer = setInterval(() => {
-      if (state !== 'play') return;
-      timeLeft--;
-      renderHud();
-      if (timeLeft <= 0) endGame('⏰ 时间到！');
-    }, 1000);
+    selId = null;
+    msg('猎人们出发了！');
+    loop = setInterval(tick, TICK);
+    render();
   }
 
   function showCard(title, html, btnText, onClick) {
@@ -250,15 +283,229 @@
   }
   function hideCard() { overlayEl.classList.add('hidden'); }
 
+  // ---------- 主循环 ----------
+  function tick() {
+    if (state !== 'play' || busy) return;
+    timeLeft -= TICK;
+    if (timeLeft <= 0) {
+      timeLeft = 0;
+      return endGame('⏰ 时间到！');
+    }
+    let changed = false;
+    for (const h of aliveHunters()) {
+      h.cd -= TICK;
+      if (h.cd <= 0) {
+        h.cd += h.role.speed;
+        if (autoStep(h)) changed = true;
+      }
+    }
+    foxCd -= TICK;
+    if (foxCd <= 0) {
+      foxCd += FOX_SPEED;
+      moveFoxes();
+      changed = true;
+    }
+    if (changed) render(); else renderHud();
+    if (checkEnd()) return;
+    checkEncounter();
+  }
+
+  function nextCell(h) {
+    let [dx, dy] = h.dir;
+    const s = h.role.step;
+    if (!inBounds(h.x + dx * s, 0)) dx = -dx;
+    if (!inBounds(0, h.y + dy * s)) dy = -dy;
+    h.dir = [dx, dy];
+    return [h.x + dx * s, h.y + dy * s];
+  }
+
+  function autoStep(h) {
+    const [nx, ny] = nextCell(h);
+    if (hunterAt(nx, ny)) {
+      // 前面有队友就掉头，免得两人面对面卡住
+      h.dir = [-h.dir[0], -h.dir[1]];
+      return false;
+    }
+    stepTo(h, nx, ny);
+    if (h.ignore > 0) h.ignore--;
+    return true;
+  }
+
+  function stepTo(h, x, y) {
+    h.x = x;
+    h.y = y;
+    if (foxAt(x, y)) {
+      h.alive = false;
+      msg(`${label(h)} 走进了狐狸窝，被咬倒下！`);
+      popText(x, y, '被咬！', '#ff5252');
+      revealIcon(x, y, '🦊');
+      return;
+    }
+    const t = treasures.find(t => !t.found && t.x === x && t.y === y);
+    if (t) {
+      t.found = true;
+      h.arrows += TREASURE_ARROWS;
+      msg(`${label(h)} 找到了箭袋，+${TREASURE_ARROWS} 支箭！`);
+      popText(x, y, `+${TREASURE_ARROWS} 🏹`, '#ffd54f');
+      revealIcon(x, y, '🎁');
+    }
+  }
+
+  function moveFoxes() {
+    const occ = new Set(foxes.map(f => key(f.x, f.y)));
+    for (const f of foxes) {
+      occ.delete(key(f.x, f.y));
+      const opts = [];
+      for (const [dx, dy] of [[0, 0], ...ALL8]) {
+        const nx = f.x + dx, ny = f.y + dy;
+        if (inBounds(nx, ny) && !occ.has(key(nx, ny))) opts.push([nx, ny]);
+      }
+      const [nx, ny] = opts[rand(opts.length)];
+      f.x = nx;
+      f.y = ny;
+      occ.add(key(nx, ny));
+      const h = hunterAt(nx, ny);
+      if (h) {
+        h.alive = false;
+        msg(`${label(h)} 被狐狸咬倒了！`);
+        popText(nx, ny, '被咬！', '#ff5252');
+        revealIcon(nx, ny, '🦊');
+      }
+    }
+  }
+
+  function checkEncounter() {
+    const h = aliveHunters().find(h => h.ignore <= 0 && countAround(h) > 0);
+    if (!h) return;
+    selId = h.id;
+    state = 'decide';
+    msg('');
+    render();
+  }
+
+  // ---------- 决定：攻击 / 移开 ----------
+  function attack() {
+    if (state !== 'decide' || busy) return;
+    const h = selected();
+    if (!h || h.arrows <= 0) return;
+    state = 'aim';
+    render();
+  }
+
+  function moveAway() {
+    if (state !== 'decide' || busy) return;
+    const h = selected();
+    if (!h) return;
+    const s = h.role.step;
+    const opts = h.role.dirs
+      .map(([dx, dy]) => ({ x: h.x + dx * s, y: h.y + dy * s }))
+      .filter(p => inBounds(p.x, p.y) && !hunterAt(p.x, p.y));
+    if (opts.length) {
+      // 往感应范围内狐狸最少的方向走，尽量不踩狐狸
+      for (const p of opts) p.score = countAt(p.x, p.y, h.role.sense) + (foxAt(p.x, p.y) ? 100 : 0) + Math.random() * 0.5;
+      opts.sort((a, b) => a.score - b.score);
+      stepTo(h, opts[0].x, opts[0].y);
+      if (h.alive) msg(`${label(h)} 避开了狐狸，继续前进`);
+    } else {
+      msg(`${label(h)} 无路可退，只好原地等待`);
+    }
+    h.ignore = MOVE_AWAY_GRACE;
+    h.cd = h.role.speed;
+    resume();
+  }
+
+  function resume() {
+    state = 'play';
+    selId = null;
+    render();
+    if (checkEnd()) return;
+    checkEncounter();
+  }
+
+  async function shoot(h, x, y) {
+    busy = true;
+    h.arrows--;
+    render();
+    await flyArrow(h, { x, y });
+    const fox = foxAt(x, y);
+    if (fox) {
+      foxes.splice(foxes.indexOf(fox), 1);
+      score++;
+      msg(`射中了！${label(h)} 抓到一只狐狸 🦊`);
+      render();
+      popText(x, y, '+1 🦊', '#b9f6ca');
+      await revealIcon(x, y, '🦊', 900);
+    } else {
+      msg(`没射中，浪费了一支箭（${label(h)} 还剩 ${h.arrows} 支）`);
+      popText(x, y, '落空', '#e0e0e0');
+      await new Promise(r => setTimeout(r, 300));
+    }
+    busy = false;
+    if (state !== 'aim') return;
+    if (checkEnd()) return;
+    if (countAround(h) > 0) {
+      state = 'decide';
+      if (h.arrows <= 0) msg(`${label(h)} 没箭了，只能移开`);
+      render();
+    } else {
+      resume();
+    }
+  }
+
+  // ---------- 点击 ----------
+  boardEl.addEventListener('click', e => {
+    const cell = e.target.closest('.cell');
+    if (!cell) return;
+    onCellClick(+cell.dataset.x, +cell.dataset.y);
+  });
+
+  function setupOptions(h) {
+    return h.role.dirs.map(([dx, dy]) => ({ x: h.x + dx, y: h.y + dy, dir: [dx, dy] }))
+      .filter(p => inBounds(p.x, p.y));
+  }
+
+  function inAim(h, x, y) {
+    const d = cheb(h, { x, y });
+    return d >= 1 && d <= h.role.sense && !hunterAt(x, y);
+  }
+
+  function onCellClick(x, y) {
+    if (busy) return;
+    if (state === 'setup') {
+      const h = hunterAt(x, y);
+      if (h) { selId = h.id; render(); return; }
+      const sel = selected();
+      const opt = sel && setupOptions(sel).find(p => p.x === x && p.y === y);
+      if (opt) {
+        sel.dir = opt.dir.slice();
+        // 自动跳到下一个猎人，方便连续设定
+        selId = sel.id % hunters.length + 1;
+        render();
+      }
+      return;
+    }
+    if (state === 'aim') {
+      const h = selected();
+      if (h && inAim(h, x, y)) shoot(h, x, y);
+      else msg('请点虚线框里的格子射箭');
+    }
+  }
+
+  function selectFromChip(h) {
+    if (state !== 'setup' || !h.alive) return;
+    selId = h.id;
+    render();
+  }
+
   // ---------- 渲染 ----------
   function renderHud() {
-    const m = Math.floor(Math.max(timeLeft, 0) / 60);
-    const s = String(Math.max(timeLeft, 0) % 60).padStart(2, '0');
-    document.getElementById('time').textContent = `${m}:${s}`;
-    document.getElementById('statTime').classList.toggle('warn', timeLeft <= 30);
+    const sec = Math.ceil(Math.max(timeLeft, 0) / 1000);
+    document.getElementById('time').textContent = `${Math.floor(sec / 60)}:${String(sec % 60).padStart(2, '0')}`;
+    document.getElementById('statTime').classList.toggle('warn', sec <= 30);
     document.getElementById('score').textContent = score;
     document.getElementById('alive').textContent = aliveHunters().length;
-    document.getElementById('turn').textContent = turn;
+    const status = { ready: '—', setup: '布阵', play: '前进中', decide: '暂停', aim: '瞄准', over: '结束' }[state];
+    document.getElementById('status').textContent = status;
   }
 
   function render() {
@@ -266,17 +513,19 @@
     const sel = selected();
     const over = state === 'over';
 
-    // 每个格子的九宫格底色：选中的猎人优先
+    // 感应范围底色：当前选中的猎人优先
     const tint = new Map();
     const order = aliveHunters().filter(h => h !== sel);
     if (sel) order.push(sel);
     for (const h of order) {
+      const r = h.role.sense;
       const c = colorFor(countAround(h));
-      const alpha = h === sel ? 0.42 : 0.22;
-      for (let dy = -1; dy <= 1; dy++) for (let dx = -1; dx <= 1; dx++) {
+      const alpha = h === sel ? 0.42 : 0.2;
+      for (let dy = -r; dy <= r; dy++) for (let dx = -r; dx <= r; dx++) {
         if (inBounds(h.x + dx, h.y + dy)) tint.set(key(h.x + dx, h.y + dy), `rgba(${c},${alpha})`);
       }
     }
+    const opts = state === 'setup' && sel ? setupOptions(sel) : [];
 
     boardEl.innerHTML = '';
     for (let y = 0; y < SIZE; y++) for (let x = 0; x < SIZE; x++) {
@@ -286,18 +535,24 @@
       cell.dataset.y = y;
       const t = tint.get(key(x, y));
       if (t) cell.innerHTML = `<div class="tint" style="background:${t}"></div>`;
-      if (sel && !over && cheb(sel, { x, y }) === 1) cell.classList.add('reach');
+      if (state === 'aim' && sel && inAim(sel, x, y)) cell.classList.add('reach');
 
       const h = hunterAt(x, y);
       const dead = hunters.find(d => !d.alive && d.x === x && d.y === y);
+      const opt = opts.find(p => p.x === x && p.y === y);
       if (h) {
-        if (h === sel) cell.classList.add('sel');
+        if (h === sel) cell.classList.add(state === 'decide' || state === 'aim' ? 'alert' : 'sel');
         const n = countAround(h);
         cell.insertAdjacentHTML('beforeend',
-          `<span class="icon">🤠</span>
+          `<span class="icon">${h.role.icon}</span>
            <span class="tag">${h.id}</span>
            <span class="badge" style="background:rgb(${colorFor(n)})">${n}</span>
-           <span class="ammo">🏹${h.arrows}</span>`);
+           <span class="ammo">🏹${h.arrows}</span>
+           <span class="dir">${DIR_GLYPH[h.dir.join(',')]}</span>`);
+      } else if (opt) {
+        const on = opt.dir.join(',') === sel.dir.join(',');
+        cell.classList.add('reach');
+        cell.insertAdjacentHTML('beforeend', `<span class="icon opt" style="opacity:${on ? 1 : .6}">${DIR_GLYPH[opt.dir.join(',')]}</span>`);
       } else if (over && foxAt(x, y)) {
         cell.insertAdjacentHTML('beforeend', '<span class="icon">🦊</span>');
       } else if (dead) {
@@ -312,14 +567,41 @@
     for (const h of hunters) {
       const chip = document.createElement('div');
       chip.className = 'hchip' + (h.alive ? '' : ' down') + (h === sel ? ' sel' : '');
-      chip.textContent = `🤠${h.id} ${h.alive ? '🏹' + h.arrows : '倒下'}`;
-      if (h.alive) chip.onclick = () => {
-        if (state !== 'play' || busy) return;
-        clearPending();
-        selId = h.id;
+      chip.innerHTML = `<b>${h.id} ${label(h)}</b> ${h.alive ? '🏹' + h.arrows : '倒下'}<small>${h.role.desc}</small>`;
+      chip.onclick = () => selectFromChip(h);
+      huntersEl.appendChild(chip);
+    }
+
+    renderPanel(sel);
+  }
+
+  function renderPanel(sel) {
+    panelEl.className = '';
+    if (state === 'setup') {
+      panelEl.innerHTML = `<div class="title">🧭 布阵：点猎人，再点他身边的箭头定方向${sel ? `（正在设定 ${label(sel)}）` : ''}</div>
+        <button class="main" id="goBtn">🚩 出发</button>`;
+      document.getElementById('goBtn').onclick = go;
+    } else if (state === 'play') {
+      panelEl.innerHTML = '<div class="title">🚶 猎人们正在自动前进……感应到狐狸时会暂停等你决定</div>';
+    } else if (state === 'decide' && sel) {
+      panelEl.className = 'decide';
+      const n = countAround(sel);
+      panelEl.innerHTML = `<div class="title">⚠️ ${label(sel)} 感应到 <b>${n}</b> 只狐狸！游戏已暂停，你要怎么做？</div>
+        <button class="main" id="atkBtn" ${sel.arrows > 0 ? '' : 'disabled'}>🏹 攻击（剩 ${sel.arrows} 支）</button>
+        <button class="alt" id="awayBtn">🚶 移开</button>`;
+      document.getElementById('atkBtn').onclick = attack;
+      document.getElementById('awayBtn').onclick = moveAway;
+    } else if (state === 'aim' && sel) {
+      panelEl.className = 'decide';
+      panelEl.innerHTML = `<div class="title">🎯 点虚线框里的一格，${label(sel)} 会朝那里射箭</div>
+        <button class="alt" id="cancelBtn">取消</button>`;
+      document.getElementById('cancelBtn').onclick = () => {
+        if (busy) return;
+        state = 'decide';
         render();
       };
-      huntersEl.appendChild(chip);
+    } else {
+      panelEl.innerHTML = '';
     }
   }
 
@@ -376,158 +658,30 @@
     return anim.finished.then(() => el.remove());
   }
 
-  // ---------- 操作 ----------
-  function clearPending() {
-    if (pending) clearTimeout(pending.timer);
-    pending = null;
-  }
-
-  boardEl.addEventListener('click', e => {
-    const cell = e.target.closest('.cell');
-    if (!cell) return;
-    onCellClick(+cell.dataset.x, +cell.dataset.y);
-  });
-  boardEl.addEventListener('dblclick', e => e.preventDefault());
-
-  function onCellClick(x, y) {
-    if (state !== 'play' || busy) return;
-    const h = hunterAt(x, y);
-    const sel = selected();
-    if (h && h !== sel) {
-      clearPending();
-      selId = h.id;
-      render();
-      return;
-    }
-    if (!sel) { msg('先点一个猎人'); return; }
-    if (h === sel) return;
-    if (cheb(sel, { x, y }) !== 1) { msg('只能在选中猎人的九宫格里行动'); return; }
-
-    if (pending && pending.x === x && pending.y === y) {
-      clearPending();
-      shoot(sel, x, y);
-      return;
-    }
-    clearPending();
-    pending = { x, y, timer: setTimeout(() => { pending = null; move(sel, x, y); }, DBL_CLICK_MS) };
-  }
-
-  async function move(h, x, y) {
-    if (state !== 'play' || busy || !h.alive) return;
-    if (hunterAt(x, y)) { msg('那里已经有猎人了'); return; }
-    busy = true;
-    h.x = x;
-    h.y = y;
-    render();
-    if (foxAt(x, y)) {
-      h.alive = false;
-      msg(`猎人${h.id} 走进了狐狸窝，被咬倒下！`);
-      render();
-      popText(x, y, '被咬！', '#ff5252');
-      await revealIcon(x, y, '🦊');
-    } else {
-      const t = treasures.find(t => !t.found && t.x === x && t.y === y);
-      if (t) {
-        t.found = true;
-        h.arrows += TREASURE_ARROWS;
-        msg(`猎人${h.id} 找到了箭袋，+${TREASURE_ARROWS} 支箭！`);
-        render();
-        popText(x, y, `+${TREASURE_ARROWS} 🏹`, '#ffd54f');
-        await revealIcon(x, y, '🎁');
-      } else {
-        msg('');
-      }
-    }
-    await endTurn();
-  }
-
-  async function shoot(h, x, y) {
-    if (state !== 'play' || busy || !h.alive) return;
-    if (h.arrows <= 0) { msg(`猎人${h.id} 没有箭了，只能移动`); return; }
-    if (hunterAt(x, y)) { msg('不能射自己人！'); return; }
-    busy = true;
-    h.arrows--;
-    render();
-    await flyArrow(h, { x, y });
-    const fox = foxAt(x, y);
-    if (fox) {
-      foxes.splice(foxes.indexOf(fox), 1);
-      score++;
-      msg(`射中了！猎人${h.id} 抓到一只狐狸 🦊`);
-      render();
-      popText(x, y, '+1 🦊', '#b9f6ca');
-      await revealIcon(x, y, '🦊', 900);
-    } else {
-      msg(`没射中，浪费了一支箭（猎人${h.id} 还剩 ${h.arrows} 支）`);
-      popText(x, y, '落空', '#e0e0e0');
-      await sleep(250);
-    }
-    await endTurn();
-  }
-
-  function moveFoxes() {
-    const bites = [];
-    const occ = new Set(foxes.map(f => key(f.x, f.y)));
-    for (const f of foxes) {
-      occ.delete(key(f.x, f.y));
-      const opts = [];
-      for (let dy = -1; dy <= 1; dy++) for (let dx = -1; dx <= 1; dx++) {
-        const nx = f.x + dx, ny = f.y + dy;
-        if (inBounds(nx, ny) && !occ.has(key(nx, ny))) opts.push([nx, ny]);
-      }
-      const [nx, ny] = opts[rand(opts.length)];
-      f.x = nx;
-      f.y = ny;
-      occ.add(key(nx, ny));
-      const h = hunterAt(nx, ny);
-      if (h) {
-        h.alive = false;
-        bites.push(h);
-      }
-    }
-    return bites;
-  }
-
-  async function endTurn() {
-    if (state !== 'play') { busy = false; return; }
-    turn++;
-    const bites = moveFoxes();
-    if (!selected()) {
-      const next = aliveHunters()[0];
-      selId = next ? next.id : null;
-    }
-    render();
-    if (bites.length) {
-      msg(bites.map(h => `猎人${h.id}`).join('、') + ' 被狐狸咬倒了！');
-      for (const h of bites) popText(h.x, h.y, '被咬！', '#ff5252');
-      await Promise.all(bites.map(h => revealIcon(h.x, h.y, '🦊')));
-    }
-    busy = false;
-    checkEnd();
-  }
-
+  // ---------- 结束 ----------
   function checkEnd() {
-    if (state !== 'play') return;
-    if (foxes.length === 0) return endGame('🎉 所有狐狸都抓到了！');
-    if (aliveHunters().length === 0) return endGame('💀 猎人全部倒下了');
+    if (state === 'over') return true;
+    if (foxes.length === 0) { endGame('🎉 所有狐狸都抓到了！'); return true; }
+    if (aliveHunters().length === 0) { endGame('💀 猎人全部倒下了'); return true; }
     const noArrows = aliveHunters().every(h => h.arrows === 0);
     const noTreasure = treasures.every(t => t.found);
-    if (noArrows && noTreasure) return endGame('🏹 箭都用完了');
+    if (noArrows && noTreasure) { endGame('🏹 箭都用完了'); return true; }
+    return false;
   }
 
   function endGame(reason) {
     state = 'over';
-    clearInterval(timer);
-    clearPending();
+    clearInterval(loop);
+    selId = null;
     render();
     msg(reason);
-    const used = TIME_LIMIT - Math.max(timeLeft, 0);
+    const used = Math.round((TIME_LIMIT - Math.max(timeLeft, 0)) / 1000);
     showCard(reason,
       `<p>抓到狐狸：<b style="color:#fff;font-size:22px">${score}</b> 只</p>
-       <p>剩余猎人：${aliveHunters().length} ／ 回合：${turn} ／ 用时：${used} 秒</p>
+       <p>剩余猎人：${aliveHunters().length} ／ 用时：${used} 秒</p>
        <p>地图上已亮出剩下的狐狸 🦊 和箭袋 🎁</p>`,
       '再玩一次', newGame);
-    // 让玩家能看到亮出的地图：点卡片外面可以关闭
+    // 点卡片外面可以关闭，看清地图
     overlayEl.onclick = e => { if (e.target === overlayEl) hideCard(); };
   }
 
