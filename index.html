@@ -41,7 +41,7 @@
   .hchip.down b { text-decoration: line-through; }
   .wrap { position: relative; width: min(94vw, 560px); }
   #board {
-    display: grid; grid-template-columns: repeat(12, 1fr);
+    display: grid; grid-template-columns: repeat(12, minmax(0, 1fr)); grid-template-rows: repeat(12, minmax(0, 1fr));
     width: 100%; aspect-ratio: 1;
     border: 3px solid #3e5a2e; border-radius: 6px; overflow: hidden;
     touch-action: manipulation; user-select: none; -webkit-user-select: none;
@@ -50,6 +50,7 @@
     position: relative; background: var(--cell); border: 1px solid var(--line);
     display: flex; align-items: center; justify-content: center;
     font-size: min(5.2vw, 28px); cursor: pointer; line-height: 1;
+    aspect-ratio: 1; min-width: 0; min-height: 0; overflow: hidden;
   }
   .cell.alt { background: var(--cell-alt); }
   .cell .tint { position: absolute; inset: 0; pointer-events: none; }
@@ -159,7 +160,7 @@
   <h3>玩法</h3>
   <ul>
     <li><b>布阵</b>：点一个猎人，再点他身边的箭头，给他定一个出发方向。都定好后点「出发」。</li>
-    <li>猎人会按自己的走法和速度<b>自动前进</b>，碰到地图边就折返。狐狸也会不停地随机乱跑。</li>
+    <li>猎人会按自己的走法和速度<b>自动前进</b>，碰到地图边就折返。狐狸 🦊 看得见，会不停地随机乱跑。</li>
     <li>猎人身上的数字 = 感应范围里有几只狐狸：
       <span style="background:#4caf50"></span>0
       <span style="background:#fbc02d"></span>1
@@ -167,8 +168,8 @@
       <span style="background:#e53935"></span>3+
     </li>
     <li>一旦有猎人感应到狐狸，<b>游戏会暂停</b>，由你决定：
-      <b>🏹 攻击</b>（在范围里点一格射箭）或 <b>🚶 移开</b>（他自动往狐狸少的方向避开，之后 3 步内不再为此停下）。</li>
-    <li>射中狐狸，它会现身并被抓住；射空就浪费一支箭。</li>
+      <b>🏹 攻击</b>（在范围里点一格射箭）、<b>🧭 改方向</b>（去追狐狸）或 <b>🚶 移开</b>（自动往狐狸少的方向避开，之后 3 步内不再为此停下）。</li>
+    <li>命中率：贴身 80%，隔一格 50%。没射中狐狸会闪开，这支箭就浪费了。射完还可以改方向或继续前进。</li>
     <li>地图上藏着 4 个箭袋 🎁，踩到就 +3 支箭。</li>
     <li>狐狸走到猎人身上，或猎人走进狐狸的格子，猎人就被咬倒下。</li>
     <li>3 分钟内（暂停时不计时）看你能抓到几只狐狸！</li>
@@ -185,6 +186,8 @@
   const FOX_SPEED = 1200;
   const TICK = 100;
   const MOVE_AWAY_GRACE = 3;
+  const RESUME_GRACE = 1;
+  const HIT_CHANCE = [0, 0.8, 0.5];
   const HUNTER_START_X = [1, 3, 6, 8, 10];
   const COLORS = ['76,175,80', '251,192,45', '251,140,0', '229,57,53'];
 
@@ -211,7 +214,7 @@
   const msgEl = document.getElementById('msg');
   const huntersEl = document.getElementById('hunters');
 
-  // state: 'ready' | 'setup' | 'play' | 'decide' | 'aim' | 'over'
+  // state: 'ready' | 'setup' | 'play' | 'decide' | 'aim' | 'redirect' | 'over'
   let hunters, foxes, treasures, selId, score, timeLeft, foxCd, loop, state, busy;
 
   const rand = n => Math.floor(Math.random() * n);
@@ -262,9 +265,9 @@
     msg('');
     render();
     showCard('🦊 狐狸狩猎',
-      `<p>5 个各有本领的猎人，10 只看不见的狐狸。</p>
+      `<p>5 个各有本领的猎人，10 只到处乱跑的狐狸。</p>
        <p>先给每个猎人定方向，他们会自动前进；</p>
-       <p>感应到狐狸时游戏暂停，由你决定攻击还是移开。</p>`,
+       <p>感应到狐狸时游戏暂停，由你决定攻击、改方向还是移开。</p>`,
       '开始布阵', () => { hideCard(); state = 'setup'; render(); });
   }
 
@@ -383,7 +386,7 @@
     render();
   }
 
-  // ---------- 决定：攻击 / 移开 ----------
+  // ---------- 决定：攻击 / 改方向 / 移开 / 继续 ----------
   function attack() {
     if (state !== 'decide' || busy) return;
     const h = selected();
@@ -414,6 +417,19 @@
     resume();
   }
 
+  function redirect() {
+    if (state !== 'decide' || busy) return;
+    state = 'redirect';
+    render();
+  }
+
+  // 改方向或继续：猎人至少要走完 1 步才会再因狐狸停下
+  function carryOn(h) {
+    h.ignore = RESUME_GRACE;
+    h.cd = h.role.speed;
+    resume();
+  }
+
   function resume() {
     state = 'play';
     selId = null;
@@ -428,13 +444,18 @@
     render();
     await flyArrow(h, { x, y });
     const fox = foxAt(x, y);
-    if (fox) {
+    const hit = fox && Math.random() < HIT_CHANCE[cheb(h, { x, y })];
+    if (hit) {
       foxes.splice(foxes.indexOf(fox), 1);
       score++;
       msg(`射中了！${label(h)} 抓到一只狐狸 🦊`);
       render();
       popText(x, y, '+1 🦊', '#b9f6ca');
       await revealIcon(x, y, '🦊', 900);
+    } else if (fox) {
+      msg(`狐狸闪开了！浪费了一支箭（${label(h)} 还剩 ${h.arrows} 支）`);
+      popText(x, y, '闪开了', '#e0e0e0');
+      await new Promise(r => setTimeout(r, 300));
     } else {
       msg(`没射中，浪费了一支箭（${label(h)} 还剩 ${h.arrows} 支）`);
       popText(x, y, '落空', '#e0e0e0');
@@ -443,13 +464,10 @@
     busy = false;
     if (state !== 'aim') return;
     if (checkEnd()) return;
-    if (countAround(h) > 0) {
-      state = 'decide';
-      if (h.arrows <= 0) msg(`${label(h)} 没箭了，只能移开`);
-      render();
-    } else {
-      resume();
-    }
+    // 射完回到决定面板：可以再射、改方向、移开或继续
+    state = 'decide';
+    if (h.arrows <= 0 && countAround(h) > 0) msg(`${label(h)} 没箭了，只能改方向或移开`);
+    render();
   }
 
   // ---------- 点击 ----------
@@ -459,7 +477,7 @@
     onCellClick(+cell.dataset.x, +cell.dataset.y);
   });
 
-  function setupOptions(h) {
+  function dirOptions(h) {
     return h.role.dirs.map(([dx, dy]) => ({ x: h.x + dx, y: h.y + dy, dir: [dx, dy] }))
       .filter(p => inBounds(p.x, p.y));
   }
@@ -475,7 +493,7 @@
       const h = hunterAt(x, y);
       if (h) { selId = h.id; render(); return; }
       const sel = selected();
-      const opt = sel && setupOptions(sel).find(p => p.x === x && p.y === y);
+      const opt = sel && dirOptions(sel).find(p => p.x === x && p.y === y);
       if (opt) {
         sel.dir = opt.dir.slice();
         // 自动跳到下一个猎人，方便连续设定
@@ -488,6 +506,18 @@
       const h = selected();
       if (h && inAim(h, x, y)) shoot(h, x, y);
       else msg('请点虚线框里的格子射箭');
+      return;
+    }
+    if (state === 'redirect') {
+      const h = selected();
+      const opt = h && dirOptions(h).find(p => p.x === x && p.y === y);
+      if (opt) {
+        h.dir = opt.dir.slice();
+        msg(`${label(h)} 转向 ${DIR_GLYPH[h.dir.join(',')]}，继续前进`);
+        carryOn(h);
+      } else {
+        msg('请点猎人身边的箭头选新方向');
+      }
     }
   }
 
@@ -504,7 +534,7 @@
     document.getElementById('statTime').classList.toggle('warn', sec <= 30);
     document.getElementById('score').textContent = score;
     document.getElementById('alive').textContent = aliveHunters().length;
-    const status = { ready: '—', setup: '布阵', play: '前进中', decide: '暂停', aim: '瞄准', over: '结束' }[state];
+    const status = { ready: '—', setup: '布阵', play: '前进中', decide: '暂停', aim: '瞄准', redirect: '改方向', over: '结束' }[state];
     document.getElementById('status').textContent = status;
   }
 
@@ -525,7 +555,7 @@
         if (inBounds(h.x + dx, h.y + dy)) tint.set(key(h.x + dx, h.y + dy), `rgba(${c},${alpha})`);
       }
     }
-    const opts = state === 'setup' && sel ? setupOptions(sel) : [];
+    const opts = (state === 'setup' || state === 'redirect') && sel ? dirOptions(sel) : [];
 
     boardEl.innerHTML = '';
     for (let y = 0; y < SIZE; y++) for (let x = 0; x < SIZE; x++) {
@@ -540,8 +570,9 @@
       const h = hunterAt(x, y);
       const dead = hunters.find(d => !d.alive && d.x === x && d.y === y);
       const opt = opts.find(p => p.x === x && p.y === y);
+      if (opt) cell.classList.add('reach');
       if (h) {
-        if (h === sel) cell.classList.add(state === 'decide' || state === 'aim' ? 'alert' : 'sel');
+        if (h === sel) cell.classList.add(['decide', 'aim', 'redirect'].includes(state) ? 'alert' : 'sel');
         const n = countAround(h);
         cell.insertAdjacentHTML('beforeend',
           `<span class="icon">${h.role.icon}</span>
@@ -549,12 +580,11 @@
            <span class="badge" style="background:rgb(${colorFor(n)})">${n}</span>
            <span class="ammo">🏹${h.arrows}</span>
            <span class="dir">${DIR_GLYPH[h.dir.join(',')]}</span>`);
+      } else if (foxAt(x, y)) {
+        cell.insertAdjacentHTML('beforeend', '<span class="icon">🦊</span>');
       } else if (opt) {
         const on = opt.dir.join(',') === sel.dir.join(',');
-        cell.classList.add('reach');
         cell.insertAdjacentHTML('beforeend', `<span class="icon opt" style="opacity:${on ? 1 : .6}">${DIR_GLYPH[opt.dir.join(',')]}</span>`);
-      } else if (over && foxAt(x, y)) {
-        cell.insertAdjacentHTML('beforeend', '<span class="icon">🦊</span>');
       } else if (dead) {
         cell.insertAdjacentHTML('beforeend', `<span class="icon faded">💀</span><span class="tag">${dead.id}</span>`);
       } else if (over && treasures.some(t => !t.found && t.x === x && t.y === y)) {
@@ -586,11 +616,28 @@
     } else if (state === 'decide' && sel) {
       panelEl.className = 'decide';
       const n = countAround(sel);
-      panelEl.innerHTML = `<div class="title">⚠️ ${label(sel)} 感应到 <b>${n}</b> 只狐狸！游戏已暂停，你要怎么做？</div>
-        <button class="main" id="atkBtn" ${sel.arrows > 0 ? '' : 'disabled'}>🏹 攻击（剩 ${sel.arrows} 支）</button>
-        <button class="alt" id="awayBtn">🚶 移开</button>`;
-      document.getElementById('atkBtn').onclick = attack;
-      document.getElementById('awayBtn').onclick = moveAway;
+      if (n > 0) {
+        panelEl.innerHTML = `<div class="title">⚠️ ${label(sel)} 感应到 <b>${n}</b> 只狐狸！游戏已暂停，你要怎么做？</div>
+          <button class="main" id="atkBtn" ${sel.arrows > 0 ? '' : 'disabled'}>🏹 攻击（剩 ${sel.arrows} 支）</button>
+          <button class="alt" id="dirBtn">🧭 改方向</button>
+          <button class="alt" id="awayBtn">🚶 移开</button>`;
+        document.getElementById('atkBtn').onclick = attack;
+        document.getElementById('awayBtn').onclick = moveAway;
+      } else {
+        panelEl.innerHTML = `<div class="title">✅ ${label(sel)} 附近没有狐狸了，要换个方向去追吗？</div>
+          <button class="alt" id="dirBtn">🧭 改方向</button>
+          <button class="main" id="goOnBtn">▶️ 继续</button>`;
+        document.getElementById('goOnBtn').onclick = () => { if (state === 'decide' && !busy) carryOn(sel); };
+      }
+      document.getElementById('dirBtn').onclick = redirect;
+    } else if (state === 'redirect' && sel) {
+      panelEl.className = 'decide';
+      panelEl.innerHTML = `<div class="title">🧭 点 ${label(sel)} 身边的箭头，选一个新方向（现在是 ${DIR_GLYPH[sel.dir.join(',')]}）</div>
+        <button class="alt" id="cancelBtn">取消</button>`;
+      document.getElementById('cancelBtn').onclick = () => {
+        state = 'decide';
+        render();
+      };
     } else if (state === 'aim' && sel) {
       panelEl.className = 'decide';
       panelEl.innerHTML = `<div class="title">🎯 点虚线框里的一格，${label(sel)} 会朝那里射箭</div>
